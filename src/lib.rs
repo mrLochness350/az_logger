@@ -1,3 +1,15 @@
+//!# az_logger
+// 
+// **az_logger** is a minimal and thread-safe logger for Rust applications. It provides easy-to-use logging macros, optional file output, colored terminal output, and configurable verbosity and filtering.
+// I'm not expecting anyone to download this, as I'll be using it mostly for my Malware Development projects.
+//!
+//! ## Example
+//! ```rust
+//! use az_logger::{Logger, LoggerOptions, info};
+//! Logger::init(Some("log.txt"), LoggerOptions::default()).unwrap();
+//! info!("Application started!");
+//! ```
+
 mod core;
 
 #[macro_use]

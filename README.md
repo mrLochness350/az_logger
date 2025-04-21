@@ -106,7 +106,7 @@ Add the following to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-az_logger = "0.1.1"
+az_logger = "0.1.2"
 
 ```
 
@@ -120,6 +120,7 @@ cargo add az_logger
 
 * 0.1.0: Initial commit
 * 0.1.1: Macro export fix
+* 0.1.2: Added docs
 
 
 ## License
