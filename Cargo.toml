@@ -5,6 +5,7 @@ edition = "2024"
 readme = "README.md"
 description = "Very simple logging class for my projects"
 repository = "https://github.com/mrLochness350/az_logger"
+license = "MIT"
 
 [dependencies]
 chrono = "0.4.40"
