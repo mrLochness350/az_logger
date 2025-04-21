@@ -81,7 +81,7 @@ fn main() {
 ## Thread Safety
 
 All internal state, including the log buffer and file handle, is wrapped in Arc, Mutex, and RwLock, ensuring safe concurrent access from multiple threads.
-I am thinking of adding async support but I don't know yet if it will be useful
+I am thinking of adding async support, but I don't know yet if it will be useful
 
 ## Example
 
@@ -106,7 +106,7 @@ Add the following to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-az_logger = "0.1.0"
+az_logger = "0.2.0"
 
 ```
 
@@ -115,6 +115,12 @@ Or, alternatively:
 ```shell
 cargo add az_logger
 ```
+
+## Changelog
+
+* 0.1.0: Initial commit
+* 0.1.1: Macro export fix
+
 
 ## License
 
