@@ -2,7 +2,7 @@
 ///
 /// ```
 /// use az_logger::{Logger, LoggerOptions, info};
-/// Logger::init(None, LoggerOptions::default()).unwrap();
+/// Logger::init(None::<String>, LoggerOptions::default()).unwrap();
 /// info!("Server is starting...");
 /// ```
 ///
@@ -21,7 +21,7 @@ macro_rules! info {
 ///
 /// ```
 /// use az_logger::{Logger, LoggerOptions, warn};
-/// Logger::init(None, LoggerOptions::default()).unwrap();
+/// Logger::init(None::<String>, LoggerOptions::default()).unwrap();
 /// warn!("This is a warning!");
 /// ```
 ///
@@ -40,7 +40,7 @@ macro_rules! warn {
 ///
 /// ```
 /// use az_logger::{Logger, LoggerOptions, debug};
-/// Logger::init(None, LoggerOptions::default()).unwrap();
+/// Logger::init(None::<String>, LoggerOptions::default()).unwrap();
 /// debug!("Debug message!");
 /// ```
 ///
@@ -59,7 +59,7 @@ macro_rules! debug {
 ///
 /// ```
 /// use az_logger::{Logger, LoggerOptions, error};
-/// Logger::init(None, LoggerOptions::default()).unwrap();
+/// Logger::init(None::<String>, LoggerOptions::default()).unwrap();
 /// error!("This is an error message!");
 /// ```
 ///
@@ -76,7 +76,7 @@ macro_rules! error {
 ///
 /// ```
 /// use az_logger::{Logger, LoggerOptions, success};
-/// Logger::init(None, LoggerOptions::default()).unwrap();
+/// Logger::init(None::<String>, LoggerOptions::default()).unwrap();
 /// success!("Server has started!");
 /// ```
 ///
@@ -96,7 +96,7 @@ macro_rules! success {
 ///
 /// ```
 /// use az_logger::{Logger, LoggerOptions, critical};
-/// Logger::init(None, LoggerOptions::default()).unwrap();
+/// Logger::init(None::<String>, LoggerOptions::default()).unwrap();
 /// critical!("A critical event has occurred!");
 /// ```
 ///

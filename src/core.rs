@@ -1,13 +1,18 @@
-use std::{fmt::Display, fs::{File, OpenOptions}, io::{self, Write}, sync::{Arc, Mutex, OnceLock, RwLock}};
+pub(crate) use crate::log_entry::{LogEntry, LogLevel};
+use crate::utils::expand_log_name_fmt;
+use crate::LogFormatStyles;
 use chrono::Local;
 use colored::Colorize;
-use serde::Serialize;
+use std::path::{Path, PathBuf};
+use std::{fs, fs::{File, OpenOptions}, io::{self, Write}, sync::{Arc, Mutex, OnceLock, RwLock}};
+#[cfg(feature="async")]
+use tokio::sync::mpsc::UnboundedSender;
 
 /// Configuration options for the global logger instance.
 #[derive(Debug, Clone)]
 pub struct LoggerOptions {
-    /// Enables or disables logging output entirely.
-    pub verbose: bool,
+    /// Enables or disables logging entirely (This flag may be removed in the future).
+    pub no_console: bool,
     /// If true, logs will be printed to stdout.
     pub log_to_stdout: bool,
     /// If true, errors and critical logs will be printed to stderr.
@@ -20,79 +25,47 @@ pub struct LoggerOptions {
     pub show_info: bool,
     /// Maximum number of logs retained in memory.
     pub max_logs: usize,
+    /// If set to `true`, the existing log file (if any) will be truncated when the logger starts.
+    /// Otherwise, new logs will be appended to the existing file.
+    pub truncate_previous_logs: bool,
+    /// Optional formatting string for dynamically naming log files.
+    /// Supports tokens like `<exe>`, `<dd>`, `<mm>`, `<HH>`, `<MM>`, `<SS>`, `<yy>`, `<yyyy>`, and `<timestamp>`.
+    ///
+    /// Example: `"<exe>_<yyyy>-<mm>-<dd>_<HH><MM><SS>.log"` might become `"myapp_2025-04-22_145109.log"`
+    pub log_name_format: Option<String>,
+    /// Optional directory path where log files will be stored.
+    /// If the directory does not exist, it will be created automatically.
+    pub log_dir: Option<String>,
+    /// Optional custom color configuration for each log level.
+    pub custom_log_styles: Option<LogFormatStyles>,
+    /// Turns off the line number logging for every logger but the debug and critical loggers
+    pub no_line_num: bool,
+    /// Turns off the file name logging for every logger but the debug and critical loggers
+    pub no_file_name: bool
 }
 
 
 impl Default for LoggerOptions {
     fn default() -> Self {
         Self {
-            verbose: true,
+            no_console: true,
             log_to_stdout: true,
             log_to_stderr: true,
             color_output: true,
             show_debug: true,
             show_info: true,
-            max_logs: 500
+            max_logs: 500,
+            truncate_previous_logs: false,
+            log_dir: None,
+            log_name_format: None,
+            custom_log_styles: None,
+            no_file_name: false,
+            no_line_num: false
+
         }
     }
 }
 
-
-/// Severity level of a log entry.
-#[derive(Debug, PartialEq, Eq, Serialize, Clone)]
-pub enum LogLevel {
-    /// Used for unrecoverable fatal issues.
-    Critical,
-    /// Used for runtime errors or failures.
-    Error,
-    /// Used for warning conditions.
-    Warn,
-    /// Used for general informational messages.
-    Info,
-    /// Used for debugging-level diagnostics.
-    Debug,
-    /// Used to indicate successful operations.
-    Success,
-}
-
-/// Represents a single log entry with metadata.
-#[derive(Serialize, Debug, Clone)]
-pub struct LogEntry {
-    /// Timestamp in `dd:mm HH:MM` format.
-    pub timestamp: String,
-    /// Severity level of the log.
-    pub level: LogLevel,
-    /// Optional file path where the log originated.
-    pub file: Option<String>,
-    /// Optional line number in the source file.
-    pub line: Option<u32>,
-    /// Actual log message content.
-    pub message: String,
-}
-impl LogEntry {
-    pub fn new(timestamp: String, level: LogLevel, message: &str, file: Option<String>, line: Option<u32>) -> Self {
-        Self {
-            timestamp,
-            level,
-            line,
-            file,
-            message: message.to_string()
-        }
-    }
-}
-
-impl Display for LogLevel {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Error => write!(f, "ERROR"),
-            Self::Debug => write!(f, "DEBUG"),
-            Self::Info => write!(f, "INFO"),
-            Self::Success => write!(f, "SUCCESS"),
-            Self::Warn => write!(f, "WARN"),
-            Self::Critical => write!(f, "CRITICAL")
-        }
-    }
-}
 /// A globally accessible, thread-safe logger.
 ///
 /// `Logger` provides centralized logging functionality for applications,
@@ -131,6 +104,10 @@ pub struct Logger {
 
     /// Logger behavior configuration (verbosity, coloring, etc.)
     options: LoggerOptions,
+
+    #[cfg(feature = "async")]
+    /// Async sender for the logger
+    pub(crate) async_sender: Option<UnboundedSender<LogEntry>>,
 }
 
 lazy_static::lazy_static! {
@@ -160,26 +137,69 @@ impl Logger {
     /// * `log_file` - Optional path to a log file for persistent logging.
     /// * `options` - LoggerOptions to control verbosity, output, and behavior.
     pub fn init(log_file: Option<impl Into<String>>, options: LoggerOptions) -> io::Result<()> {
-        let logfile = if let Some(log_file) = log_file {
-            let log_file = log_file.into();
-            let file = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(log_file)
-                .ok()
-                .map(|f| Arc::new(Mutex::new(f)));
-            file
+        if let Some(log_dir) = &options.log_dir {
+            let pb = PathBuf::from(log_dir);
+            if !pb.exists() {
+                fs::create_dir_all(&pb)?;
+            }
+        }
+
+        let path = match (&options.log_name_format, log_file) {
+            (Some(fmt), _) => {
+                let filename = expand_log_name_fmt(fmt);
+                match &options.log_dir {
+                    Some(dir) => Path::new(dir).join(filename),
+                    None => PathBuf::from(filename),
+                }
+            }
+            (None, Some(path)) => {
+                let path: String = path.into();
+                PathBuf::from(path)
+            },
+            _ => PathBuf::new(),
+        };
+
+        let logfile = if path.as_os_str().is_empty() {
+            None
+        } else {
+            let opts = Self::create_log_file_options(options.truncate_previous_logs);
+            Some(opts.open(&path)
+                .map(|f| Arc::new(Mutex::new(f)))
+                .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Failed to open log file: {}", e)))?)
+        };
+        #[cfg(feature = "async")]
+        let async_sender = if !path.as_os_str().is_empty() {
+            Self::try_spawn_async_writer(path.clone(), options.truncate_previous_logs)
         } else {
             None
         };
+
         let logger = Logger {
             log_file: logfile,
             logs: Arc::new(RwLock::new(Vec::with_capacity(options.max_logs))),
             options,
+            #[cfg(feature = "async")]
+            async_sender,
         };
 
-        LOGGER_INSTANCE.set(RwLock::new(logger)).map_err(|_| io::Error::new(std::io::ErrorKind::Other, "Failed to set logger instance!"))?;
+        LOGGER_INSTANCE
+            .set(RwLock::new(logger))
+            .map_err(|_| io::Error::new(io::ErrorKind::Other, "Logger already initialized"))?;
+
         Ok(())
+    }
+
+    /// Internal util to clear clutter
+    fn create_log_file_options(truncate: bool) ->  OpenOptions {
+        let mut opts = OpenOptions::new();
+        opts.create(true);
+        opts.write(true);
+        if truncate {
+            opts.truncate(true);
+        } else {
+            opts.append(true);
+        }
+        opts
     }
 
     /// Core internal logging function.
@@ -198,7 +218,7 @@ impl Logger {
     /// - `file`: Source file path (typically captured via `file!()`).
     /// - `line`: Line number in source file (typically captured via `line!()`).
     fn log(&self, level: LogLevel, message: &str, file: &str, line: u32) {
-        if !self.options.verbose {
+        if !self.options.no_console {
             return;
         }
 
@@ -214,31 +234,24 @@ impl Logger {
             log_lock.pop();
         }
 
-        let fmt = match level {
-            LogLevel::Debug | LogLevel::Error | LogLevel::Warn | LogLevel::Critical => {
-                log_lock.push(LogEntry::new(timestamp.clone(), level.clone(), message, Some(file.to_string()), Some(line)));
-                format!("[{}] [{}][{}:{}]: {}", timestamp, level, file, line, message)
+        let entry = match level {
+            LogLevel::Error | LogLevel::Warn | LogLevel::Success | LogLevel::Info => {
+                if self.options.no_line_num {
+                    LogEntry::new(timestamp.clone(), level.clone(), message, Some(file.to_string()), None)
+                } else if self.options.no_line_num && self.options.no_file_name {
+                    LogEntry::new(timestamp.clone(), level.clone(), message, None, None)
+                } else {
+                    LogEntry::new(timestamp.clone(), level.clone(), message, Some(file.to_string()), Some(line))
+                }
             }
             _ => {
-                log_lock.push(LogEntry::new(timestamp.clone(), level.clone(), message, None, None));
-                format!("[{}] [{}]: {}", timestamp, level, message)
+                LogEntry::new(timestamp.clone(), level.clone(), message, Some(file.to_string()), Some(line))
             }
         };
-
+        let fmt = entry.format();
+        log_lock.push(entry);
         if self.options.log_to_stdout || self.options.log_to_stderr {
-            let log_entry = if self.options.color_output {
-                match level {
-                    LogLevel::Debug => fmt.yellow().on_black().to_string(),
-                    LogLevel::Error => fmt.bright_red().bold().to_string(),
-                    LogLevel::Warn => fmt.yellow().to_string(),
-                    LogLevel::Info => fmt.cyan().to_string(),
-                    LogLevel::Success => fmt.green().to_string(),
-                    LogLevel::Critical => fmt.bright_red().bold().on_bright_cyan().to_string(),
-                }
-            } else {
-                fmt.clone()
-            };
-
+            let log_entry = self.apply_log_color(&level, &fmt);
             match level {
                 LogLevel::Error | LogLevel::Critical if self.options.log_to_stderr => {
                     eprintln!("{}", log_entry);
@@ -250,6 +263,15 @@ impl Logger {
             }
         }
 
+        #[cfg(feature = "async")]
+        if let Some(sender) = &self.async_sender {
+            let log_entry = log_lock.last().unwrap().clone();
+            let _ = sender.send(log_entry);
+        } else if let Some(file) = &self.log_file {
+            let mut file = file.lock().unwrap();
+            writeln!(file, "{}", fmt).unwrap();
+        }
+        #[cfg(not(feature = "async"))]
         if let Some(file) = &self.log_file {
             let mut file = file.lock().unwrap();
             writeln!(file, "{}", fmt).unwrap();
@@ -286,4 +308,33 @@ impl Logger {
         LOGGER_INSTANCE.get().unwrap().write().unwrap().log(LogLevel::Critical, message, file, line);
     }
 
+    /// Apply color formatting to the log message based on level and user options.
+    fn apply_log_color(&self, level: &LogLevel, message: &str) -> String {
+        if !self.options.color_output {
+            return message.to_string();
+        }
+
+        if let Some(colors) = &self.options.custom_log_styles {
+            let colored = match level {
+                LogLevel::Error => colors.error.apply(message),
+                LogLevel::Warn => colors.warn.apply(message),
+                LogLevel::Info => colors.info.apply(message),
+                LogLevel::Debug => colors.debug.apply(message),
+                LogLevel::Success => colors.success.apply(message),
+                LogLevel::Critical => colors.critical.apply(message),
+            };
+            return colored.to_string();
+        }
+
+        let default_colors = match level {
+            LogLevel::Debug => message.yellow().on_black(),
+            LogLevel::Error => message.bright_red().bold(),
+            LogLevel::Warn => message.yellow(),
+            LogLevel::Info => message.cyan(),
+            LogLevel::Success => message.green(),
+            LogLevel::Critical => message.bright_red().bold().on_bright_cyan(),
+        };
+
+        default_colors.to_string()
+    }
 }

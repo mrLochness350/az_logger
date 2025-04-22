@@ -1,2 +1,5 @@
 /target
 .idea
+test_logs*
+*.log
+log.txt

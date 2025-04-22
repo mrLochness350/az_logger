@@ -1,9 +1,9 @@
 [package]
 name = "az_logger"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2024"
 readme = "README.md"
-description = "Very simple logging class for my projects"
+description = "Very simple logging crate for my projects"
 repository = "https://github.com/mrLochness350/az_logger"
 license = "MIT"
 
@@ -12,3 +12,11 @@ chrono = "0.4.40"
 serde = { version = "1.0.219", features = ["derive"] }
 lazy_static = "1.5.0"
 colored = "3.0.0"
+tokio = { version = "1.44.2", optional = true, features = ["sync", "rt", "fs", "io-util"] }
+
+[dev-dependencies]
+tokio = { version = "1.44.2", features = ["sync", "rt", "fs", "io-util", "macros", "time"]}
+
+[features]
+default = []
+async = ["tokio"]
