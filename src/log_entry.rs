@@ -177,14 +177,15 @@ impl LogEntry {
         }
     }
 
-    pub fn format(&self, hide_level: bool) -> String {
+    pub fn format(&self, hide_level: bool, no_date: bool) -> String {
+        let date_str = if no_date { String::new() } else { format!("[{}] ", self.timestamp) };
         let level_str = if hide_level { String::new() } else { format!("[{}]", self.level) };
 
         match (self.file.as_ref(), self.line) {
-            (Some(file), Some(line)) => format!("[{}] {}[{}:{}]: {}", self.timestamp, level_str, file, line, self.message),
-            (Some(file), None) => format!("[{}] {}[{}]: {}", self.timestamp, level_str, file, self.message),
-            (None, Some(line)) => format!("[{}] {}[line {}]: {}", self.timestamp, level_str, line, self.message),
-            (None, None) => format!("[{}] {}{}", self.timestamp, level_str, self.message),
+            (Some(file), Some(line)) => format!("{}{}[{}:{}]: {}", date_str, level_str, file, line, self.message),
+            (Some(file), None) => format!("{}{}[{}]: {}", date_str, level_str, file, self.message),
+            (None, Some(line)) => format!("{}{}[line {}]: {}", date_str, level_str, line, self.message),
+            (None, None) => format!("{}{}{}", date_str, level_str, self.message),
         }
     }
 }

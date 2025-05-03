@@ -44,7 +44,7 @@ fn test_log_entry_format_all_fields() {
         Some(42),
     );
 
-    let formatted = entry.format(false);
+    let formatted = entry.format(false, false);
     assert_eq!(formatted, "[01:05 1234] [INFO][main.rs:42]: hello");
 }
 
@@ -58,7 +58,7 @@ fn test_log_entry_format_hide_level() {
         Some(10),
     );
 
-    let formatted = entry.format(true);
+    let formatted = entry.format(true, false);
     assert_eq!(formatted, "[01:05 1234] [debug.rs:10]: debugging");
 }
 
@@ -72,7 +72,7 @@ fn test_log_entry_format_no_file() {
         Some(3),
     );
 
-    let formatted = entry.format(false);
+    let formatted = entry.format(false, false);
     assert_eq!(formatted, "[01:05 1234] [WARN][line 3]: warning");
 }
 

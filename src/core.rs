@@ -42,8 +42,10 @@ pub struct LoggerOptions {
     pub no_line_num: bool,
     /// Turns off the file name logging for every logger but the debug and critical loggers
     pub no_file_name: bool,
-    /// Hides the level string in the log entry
-    pub hide_level_string: bool
+    /// Turns off the level string in the log entry
+    pub no_level_string: bool,
+    /// Turns off the date string in the log entry
+    pub no_date: bool
 
 }
 
@@ -64,7 +66,8 @@ impl Default for LoggerOptions {
             custom_log_styles: None,
             no_file_name: false,
             no_line_num: false,
-            hide_level_string: false
+            no_level_string: false,
+            no_date: false
         }
     }
 }
@@ -172,7 +175,7 @@ impl Logger {
         };
         #[cfg(feature = "async")]
         let async_sender = if !path.as_os_str().is_empty() {
-            Self::try_spawn_async_writer(path.clone(), options.truncate_previous_logs, options.hide_level_string)
+            Self::try_spawn_async_writer(path.clone(), options.truncate_previous_logs, options.no_level_string, options.no_date)
         } else {
             None
         };
@@ -240,7 +243,7 @@ impl Logger {
         let file_opt = if self.options.no_file_name { None } else { Some(file.to_string()) };
         let line_opt = if self.options.no_line_num { None } else { Some(line) };
         let entry = LogEntry::new(timestamp.clone(), level.clone(), message, file_opt, line_opt);
-        let fmt = entry.format(self.options.hide_level_string);
+        let fmt = entry.format(self.options.no_level_string, self.options.no_date);
         log_lock.push(entry);
         if self.options.log_to_stdout || self.options.log_to_stderr {
             let log_entry = self.apply_log_color(&level, &fmt);

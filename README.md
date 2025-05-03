@@ -60,27 +60,29 @@ fn main() {
         custom_log_styles: Some(custom_log_styles),
         no_line_num: false,
         no_file_name: false,
-        hide_level_string: false
+        no_level_string: false,
+        no_date: false,
     };
 }
 ```
 
-| Field                     | Description                                                                      |
-|---------------------------|----------------------------------------------------------------------------------|
-| `no_console`              | Enables or disables all output                                                   |
-| `log_to_stdout`           | Enables printing to stdout                                                       |
-| `log_to_stderr`           | Enables printing error and critical logs to stderr                               |
-| `color_output`            | Enables colored output                                                           |
-| `show_debug`              | Enables debug-level logs                                                         |
-| `show_info`               | Enables info-level logs                                                          |
-| `max_logs`                | Specifies a limit on the amount of logs in the buffer                            |
-| `truncate_previous_logs`  | If true, the existing log file will be truncated instead of appended             |
-| `log_name_format`         | Optional pattern to dynamically format the log file name                         |
-| `log_dir`                 | Directory path where the log file will be created (if specified)                 |
-| `custom_log_styles`       | An optional [LogFormatStyles] struct to configure log styling per level          |
-| `no_line_num`             | Disables line number logging for every logger except debug/critical              |
-| `no_file_name`            | Disables file name logging for every logger except debug/critical                |
-| `hide_level_string`       | Hides the level string in the log entry                                          | 
+| Field                    | Description                                                             |
+|--------------------------|-------------------------------------------------------------------------|
+| `no_console`             | Enables or disables all output                                          |
+| `log_to_stdout`          | Enables printing to stdout                                              |
+| `log_to_stderr`          | Enables printing error and critical logs to stderr                      |
+| `color_output`           | Enables colored output                                                  |
+| `show_debug`             | Enables debug-level logs                                                |
+| `show_info`              | Enables info-level logs                                                 |
+| `max_logs`               | Specifies a limit on the amount of logs in the buffer                   |
+| `truncate_previous_logs` | If true, the existing log file will be truncated instead of appended    |
+| `log_name_format`        | Optional pattern to dynamically format the log file name                |
+| `log_dir`                | Directory path where the log file will be created (if specified)        |
+| `custom_log_styles`      | An optional [LogFormatStyles] struct to configure log styling per level |
+| `no_line_num`            | Disables line number logging for every logger except debug/critical     |
+| `no_file_name`           | Disables file name logging for every logger except debug/critical       |
+| `no_level_string`        | Disables level string logging in the log entry                          |
+| `no_date`                | Disables date logging for entries                                       |
 >[!NOTE]  
 > If `color_output` is set to `false`, `custom_log_styles` will be ignored
 
@@ -181,7 +183,7 @@ Add the following to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-az_logger = "0.1.4"
+az_logger = "0.1.5"
 
 ```
 

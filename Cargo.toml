@@ -1,6 +1,6 @@
 [package]
 name = "az_logger"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2024"
 readme = "README.md"
 description = "Very simple logging crate for my projects"
