@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] - 2025-05-03
+
+### Added
+
+- `hide_level_string` flag for hiding the level string in the entry (`[INFO/WARN/...]`)
+
+### Changed
+
+- Fixed `no_line_num` and `no_file_name` flags not working correctly
+
 ## [0.1.3] - 2025-04-22
 
 ### Added

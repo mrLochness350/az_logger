@@ -41,7 +41,10 @@ pub struct LoggerOptions {
     /// Turns off the line number logging for every logger but the debug and critical loggers
     pub no_line_num: bool,
     /// Turns off the file name logging for every logger but the debug and critical loggers
-    pub no_file_name: bool
+    pub no_file_name: bool,
+    /// Hides the level string in the log entry
+    pub hide_level_string: bool
+
 }
 
 
@@ -60,8 +63,8 @@ impl Default for LoggerOptions {
             log_name_format: None,
             custom_log_styles: None,
             no_file_name: false,
-            no_line_num: false
-
+            no_line_num: false,
+            hide_level_string: false
         }
     }
 }
@@ -169,7 +172,7 @@ impl Logger {
         };
         #[cfg(feature = "async")]
         let async_sender = if !path.as_os_str().is_empty() {
-            Self::try_spawn_async_writer(path.clone(), options.truncate_previous_logs)
+            Self::try_spawn_async_writer(path.clone(), options.truncate_previous_logs, options.hide_level_string)
         } else {
             None
         };
@@ -227,28 +230,17 @@ impl Logger {
             return;
         }
 
-        let timestamp = Local::now().format("%d:%m %H:%M").to_string();
+        let timestamp = Local::now().format("%d-%m %H:%M").to_string();
         let mut log_lock = self.logs.write().unwrap();
 
         if log_lock.len() >= self.options.max_logs {
             log_lock.pop();
         }
 
-        let entry = match level {
-            LogLevel::Error | LogLevel::Warn | LogLevel::Success | LogLevel::Info => {
-                if self.options.no_line_num {
-                    LogEntry::new(timestamp.clone(), level.clone(), message, Some(file.to_string()), None)
-                } else if self.options.no_line_num && self.options.no_file_name {
-                    LogEntry::new(timestamp.clone(), level.clone(), message, None, None)
-                } else {
-                    LogEntry::new(timestamp.clone(), level.clone(), message, Some(file.to_string()), Some(line))
-                }
-            }
-            _ => {
-                LogEntry::new(timestamp.clone(), level.clone(), message, Some(file.to_string()), Some(line))
-            }
-        };
-        let fmt = entry.format();
+        let file_opt = if self.options.no_file_name { None } else { Some(file.to_string()) };
+        let line_opt = if self.options.no_line_num { None } else { Some(line) };
+        let entry = LogEntry::new(timestamp.clone(), level.clone(), message, file_opt, line_opt);
+        let fmt = entry.format(self.options.hide_level_string);
         log_lock.push(entry);
         if self.options.log_to_stdout || self.options.log_to_stderr {
             let log_entry = self.apply_log_color(&level, &fmt);

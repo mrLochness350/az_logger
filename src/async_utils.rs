@@ -6,7 +6,7 @@ use crate::{LogEntry, Logger};
 impl Logger {
     #[cfg(feature = "async")]
     /// Spawns an asynchronous thread for asynchronous logging
-    fn spawn_async_writer(path: PathBuf, truncate: bool) -> UnboundedSender<LogEntry> {
+    fn spawn_async_writer(path: PathBuf, truncate: bool, hide_level: bool) -> UnboundedSender<LogEntry> {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<LogEntry>();
         tokio::spawn(async move {
             use tokio::io::AsyncWriteExt;
@@ -28,7 +28,7 @@ impl Logger {
             };
 
             while let Some(entry) = rx.recv().await {
-                let msg = entry.format();
+                let msg = entry.format(hide_level);
                 println!("Received entry");
                 if let Err(e) = file.write_all(msg.as_bytes()).await {
                     eprintln!("Logger async write error: {}", e);
@@ -39,12 +39,12 @@ impl Logger {
     }
     #[cfg(feature = "async")]
     /// Small wrapper function to check if the current runtime is a tokio runtime
-    pub(crate) fn try_spawn_async_writer(path: PathBuf, truncate: bool) -> Option<UnboundedSender<LogEntry>> {
+    pub(crate) fn try_spawn_async_writer(path: PathBuf, truncate: bool, hide_level: bool) -> Option<UnboundedSender<LogEntry>> {
         if tokio::runtime::Handle::try_current().is_err() {
             eprintln!("{}", "[az_logger] Async logging is enabled, but no Tokio runtime is active. Defaulting to sync logging".bright_red().bold().underline().to_string());
             return None;
         }
 
-        Some(Self::spawn_async_writer(path, truncate))
+        Some(Self::spawn_async_writer(path, truncate, hide_level))
     }
 }
